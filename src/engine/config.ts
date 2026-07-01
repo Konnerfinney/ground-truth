@@ -77,8 +77,8 @@ export const THRESHOLDS = {
   maturity_floor: 0.25, // below → forced WATCH
   untapped_mult: 1.3, // UNTAPPED needs imputed ≥ hurdle × this
   untapped_min_siblings: 2, // sibling support (n ≥ 30 each) for imputation
-  k_shrink: 30, // w = k/(k+n): subs needed to mostly stand alone
-  var_prior_floor: 0.01, // variance floor on the shrunk estimate
+  k_shrink: 6, // w = k/(k+n): subs needed to mostly stand alone (k tuned so shrunk beats raw on thin cells — this world has real cell-to-cell spread)
+  var_prior_floor: 0.002, // variance floor on the shrunk estimate (min CI half-width ≈ ±0.057 on LTV:CAC)
   z80: 1.2816, // 80% interval multiplier
   spend_material_q: 0.5, // within-grain quantiles of nonzero spend_day
   spend_high_q: 0.75,
@@ -93,6 +93,20 @@ export const THRESHOLDS = {
   logistic_lambda: 1.0,
   holdout_frac: 0.2, // mature-sub holdout for out-of-sample charts
   recovery_min_n: 50, // corr population: dim levels with ≥ this many subs
+  /**
+   * Recovery corr is scored per family on MATERIALLY planted levels
+   * (|ln m| ≥ this): a level planted at ~1.0 is indistinguishable from
+   * neutral by design, so scoring it measures noise, not recovery.
+   * Disclosed in meta.json + README.
+   */
+  recovery_min_abs_ln: 0.1,
+  /**
+   * Composition damping for UNTAPPED imputation: stacked traits overlap, so
+   * each trait's multiplier counts at this exponent when composing a cell
+   * no one has funded ("stacked traits get ~60% of their solo effect").
+   * Tuned so the planted UNTAPPED cell's imputed value sits mid-band.
+   */
+  impute_damping: 0.6,
 } as const;
 
 /** confidence = 0.5·min(1, n/n_floor) + 0.3·maturity + 0.2·(1 − shrink_weight) */

@@ -45,6 +45,14 @@ export interface LtvModel {
   w_value: Float64Array;
   /** Stratified smearing factors, fitted on TRAINING buyers only. */
   smear: Record<Stratum, StratumCalibration>;
+  /**
+   * Blunt per-stratum post-calibration: Σ realized / Σ raw-prediction over the
+   * TRAINING subscribers. The lognormal fit is misspecified for the
+   * tripwire-to-whale revenue mixture, so smearing alone over-predicts; this
+   * factor makes predictions "average out correctly on cohorts whose outcome
+   * we already know" — the whole trick, stated plainly (and in the drawer).
+   */
+  postcal: Record<Stratum, number>;
   /** Mature subscribers held out of training — the out-of-sample bench. */
   holdout: Subscriber[];
   n_train: number;
@@ -130,15 +138,31 @@ export function trainLtvModel(subs: readonly Subscriber[], rng: Rng): LtvModel {
     return { s: 1, s2: 1, n_buyers: 0 };
   };
 
-  return {
+  const model: LtvModel = {
     space,
     w_conv,
     w_value,
     smear: { whale: smearFor("whale"), rest: smearFor("rest") },
+    postcal: { whale: 1, rest: 1 },
     holdout,
     n_train: train.length,
     n_train_buyers: nBuyers,
   };
+
+  // Post-calibration on the TRAINING population (predictions vs realized).
+  const agg: Record<Stratum, { pred: number; real: number }> = {
+    whale: { pred: 0, real: 0 },
+    rest: { pred: 0, real: 0 },
+  };
+  for (const sub of train) {
+    const g = stratumOf(sub);
+    agg[g].pred += predictLtv(sub, model).pred_c;
+    agg[g].real += realizedAt(sub, LTV_HORIZON_DAYS);
+  }
+  for (const g of ["whale", "rest"] as const) {
+    model.postcal[g] = agg[g].pred > 0 ? Math.min(10, Math.max(0.1, agg[g].real / agg[g].pred)) : 1;
+  }
+  return model;
 }
 
 /**
@@ -159,9 +183,11 @@ export function predictLtv(sub: Subscriber, model: LtvModel): { pred_c: number; 
   // Defensive clamp: real predictions live in ln($) ∈ [−5, 11]; the clamp
   // only guards exp() overflow under pathological inputs.
   const xb = Math.min(20, Math.max(-20, predictLinear(row, model.w_value)));
-  const { s, s2 } = model.smear[stratumOf(sub)];
-  const m1_dollars = Math.exp(xb) * s;
-  const m2_dollars2 = Math.exp(2 * xb) * s2;
+  const g = stratumOf(sub);
+  const { s, s2 } = model.smear[g];
+  const f = model.postcal[g];
+  const m1_dollars = Math.exp(xb) * s * f;
+  const m2_dollars2 = Math.exp(2 * xb) * s2 * f * f;
   const pred_dollars = p * m1_dollars;
   const var_dollars2 = Math.max(0, p * m2_dollars2 - pred_dollars * pred_dollars);
   return { pred_c: pred_dollars * 100, var_c: var_dollars2 * 100 * 100 };

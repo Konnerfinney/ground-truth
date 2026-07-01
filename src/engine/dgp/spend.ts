@@ -182,6 +182,24 @@ export function buildCampaigns(rng: Rng): Campaign[] {
   u.creatives = ["education"];
   u.placements = ["newsletter-cross-promo"];
 
+  // CPL-CHASERS: mid-head campaigns that bought cheap leads (hype/crypto
+  // tripwire combos). Real budget, genuinely bad 90d economics — the brief's
+  // KILL/TRIM bleed comes from here, exactly the waste the tool exists to
+  // catch. Meta chasers avoid reels so the planted FLIP cell stays isolated.
+  const chasers = campaigns
+    .filter((c) => !c.flipCarrier && !c.untappedCarrier)
+    .sort((a, b) => b.propensity - a.propensity || a.id.localeCompare(b.id))
+    .slice(2, 16);
+  for (const c of chasers) {
+    c.offer = "tripwire-7";
+    // Single-combo: the campaign IS the mistake, so its campaign-grain row
+    // bleeds unambiguously instead of averaging against saner adsets.
+    c.audiences = ["crypto-curious"];
+    c.creatives = ["hype-10x"];
+    // Meta chasers stay off reels so the planted FLIP cell owns its numbers.
+    if (c.platform === "meta") c.placements = ["fb-feed"];
+  }
+
   return campaigns;
 }
 
@@ -307,7 +325,7 @@ export function buildSpend(campaigns: Campaign[], truth: TruthEffects, rng: Rng)
         } else {
           const nAtoms = Math.max(
             2,
-            Math.min(6, 2 + Math.floor(Math.log2(Math.max(1, comboBudget / TUNING.atom_unit_c)))),
+            Math.min(TUNING.max_atoms, 2 + Math.floor(Math.log2(Math.max(1, comboBudget / TUNING.atom_unit_c)))),
           );
           const weights = atomWeightsCached(c.platform, combo.placement).slice();
           const picked: { idx: number; wt: number }[] = [];

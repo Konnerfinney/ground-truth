@@ -93,15 +93,21 @@ export function decompose(subs: readonly Subscriber[]): DimEffect[] {
     }
   }
 
-  // CONVERSION family: buyer flag over all mature subs.
+  // CONVERSION family: FRONT-END purchase over all mature subs. The front
+  // door is what the planted m_feconv drives; "did they EVER pay" would mix
+  // in back-end value (m_ltv) and blur both families (adversarial finding).
   const rows = mature.map((s) => encode(s, space));
-  const buyFlags = mature.map((s) => (isBuyerAt(s, LTV_HORIZON_DAYS) ? 1 : 0));
+  const convFlags = mature.map((s) => (s.first_purchase ? 1 : 0));
   const wConv =
     mature.length > 0
-      ? fitLogistic(rows, buyFlags, space.d, THRESHOLDS.logistic_lambda)
+      ? fitLogistic(rows, convFlags, space.d, THRESHOLDS.logistic_lambda)
       : new Float64Array(space.d);
 
-  // VALUE family: asinh(realized dollars) over buyers only.
+  // VALUE family: asinh(realized dollars) over 90d BUYERS only — "what does
+  // this trait add to what a buyer ends up worth?". Fitting over all subs
+  // would mix in the propensity to buy at all, which belongs to the
+  // conversion family (the adversarial-review finding this design answers).
+  const buyFlags = mature.map((s) => (isBuyerAt(s, LTV_HORIZON_DAYS) ? 1 : 0));
   const buyerRows: typeof rows = [];
   const buyerY: number[] = [];
   let buyerRevTotal = 0;
@@ -202,7 +208,9 @@ export function imputeLtvPerDollar(
     const eff = byKey.get(`${dim}=${level}`);
     if (!eff) continue; // unseen level ⇒ ×1
     const mult = (buyerMeanDollars + eff.effect_value_usd) / buyerMeanDollars;
-    composed_c *= Math.min(20, Math.max(0.05, mult));
+    // Damped stacking: traits overlap, so each multiplier counts at ~85%
+    // when composing a cell nobody has funded (THRESHOLDS.impute_damping).
+    composed_c *= Math.pow(Math.min(20, Math.max(0.05, mult)), THRESHOLDS.impute_damping);
   }
   return composed_c / meanCpl_c;
 }
@@ -269,32 +277,74 @@ export function recoveryReport(
   truth: TruthEffects,
   rng: Rng,
 ): RecoveryReport {
+  // The recovered effects are centered WITHIN each dim (n-weighted), so the
+  // planted ln(m) values must be centered the same way before comparing —
+  // otherwise every dim contributes a spurious offset that attenuates the
+  // correlation without meaning anything.
+  const centered = new Map<string, { ln_ltv: number; ln_conv: number }>();
+  for (const dim of new Set(effects.map((e) => e.dim))) {
+    if (!truth.m[dim]) continue;
+    const dimEffects = effects.filter((e) => e.dim === dim);
+    let n = 0;
+    let sumLtv = 0;
+    let sumConv = 0;
+    for (const e of dimEffects) {
+      const p = truth.m[dim]?.[e.level];
+      sumLtv += e.n * Math.log(p?.m_ltv ?? 1);
+      sumConv += e.n * Math.log(p?.m_feconv ?? 1);
+      n += e.n;
+    }
+    const meanLtv = n > 0 ? sumLtv / n : 0;
+    const meanConv = n > 0 ? sumConv / n : 0;
+    for (const e of dimEffects) {
+      const p = truth.m[dim]?.[e.level];
+      centered.set(`${dim}=${e.level}`, {
+        ln_ltv: Math.log(p?.m_ltv ?? 1) - meanLtv,
+        ln_conv: Math.log(p?.m_feconv ?? 1) - meanConv,
+      });
+    }
+  }
+
   const table: RecoveryRow[] = [];
   for (const e of effects) {
     if (e.n < THRESHOLDS.recovery_min_n) continue;
-    const planted = truth.m[e.dim]?.[e.level];
+    // Dims with no planted table (campaign, ad_account) carry no signal to
+    // recover — scoring them would measure noise against a column of zeros.
+    if (!truth.m[e.dim]) continue;
+    const c = centered.get(`${e.dim}=${e.level}`) ?? { ln_ltv: 0, ln_conv: 0 };
     table.push({
       dim: e.dim,
       level: e.level,
       n: e.n,
       effect_value_usd: e.effect_value_usd,
-      planted_ln_m_ltv: Math.log(planted?.m_ltv ?? 1),
+      planted_ln_m_ltv: c.ln_ltv,
       effect_conv: e.effect_conv,
-      planted_ln_m_feconv: Math.log(planted?.m_feconv ?? 1),
+      planted_ln_m_feconv: c.ln_conv,
     });
   }
 
-  const recoveredValue = table.map((r) => r.effect_value_usd);
-  const plantedLtv = table.map((r) => r.planted_ln_m_ltv);
-  const permutedLtv = rng.shuffle(plantedLtv);
+  // Score each family on its MATERIALLY planted levels only (|ln m| ≥ knob):
+  // a level planted ≈ 1.0 is designed to be indistinguishable from neutral.
+  const valueRows = table.filter((r) => Math.abs(r.planted_ln_m_ltv) >= THRESHOLDS.recovery_min_abs_ln);
+  const convRows = table.filter((r) => Math.abs(r.planted_ln_m_feconv) >= THRESHOLDS.recovery_min_abs_ln);
+  const recoveredValue = valueRows.map((r) => r.effect_value_usd);
+  const plantedLtv = valueRows.map((r) => r.planted_ln_m_ltv);
+  // A single permutation of ~30 points is itself noisy; average the |corr|
+  // over 20 permutations so the "no signal" claim is stable across seeds.
+  let negControl = 0;
+  const N_PERM = 20;
+  for (let p = 0; p < N_PERM; p++) {
+    negControl += Math.abs(pearson(recoveredValue, rng.shuffle(plantedLtv)));
+  }
+  negControl /= N_PERM;
 
   return {
     value_corr: pearson(recoveredValue, plantedLtv),
     conv_corr: pearson(
-      table.map((r) => r.effect_conv),
-      table.map((r) => r.planted_ln_m_feconv),
+      convRows.map((r) => r.effect_conv),
+      convRows.map((r) => r.planted_ln_m_feconv),
     ),
-    negative_control_corr: pearson(recoveredValue, permutedLtv),
+    negative_control_corr: negControl,
     table,
   };
 }

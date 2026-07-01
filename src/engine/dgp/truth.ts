@@ -117,7 +117,7 @@ export const TUNING = {
   fp_intercept: -1.3,
   // --- impulse OTO (SPEC §7.2.4 ★ — the flip mechanic) ---------------------
   oto_intercept: -2.944, // σ(-2.944) ≈ 0.05 baseline take-rate
-  oto_feconv_coef: 1.39, // → ≈0.25–0.35 in the flip cell
+  oto_feconv_coef: 1.52, // ~0.35-0.4 take-rate in the flip cell (keeps its platform ROAS safely mid-band)
   oto_amount_c: 99_00, // immediate core-99 one-time offer
   // --- core sale d3–30 ------------------------------------------------------
   core_z_coef: 1.1,
@@ -141,11 +141,11 @@ export const TUNING = {
   affiliate_min_c: 2_00,
   affiliate_max_c: 1_000_00,
   // --- managed-money whales d20–90 (Pareto, winsorized) ---------------------
-  whale_base_p: 0.012,
+  whale_base_p: 0.025,
   whale_z_coef: 0.55,
   whale_max_p: 0.1,
   whale_pareto_xm_c: 1_000_00,
-  whale_pareto_alpha: 1.6,
+  whale_pareto_alpha: 2.6, // more, smaller whales: same total, far stabler stratum calibration
   // --- refunds d3–30 (negative; platforms never see them) ------------------
   refund_base_p: 0.07,
   refund_oto_boost: 4.0, // OTO takers refund at m_refund-elevated rates ★
@@ -154,7 +154,7 @@ export const TUNING = {
   shock_feconv_mult: 1.6,
   shock_creatives: ["fear-inflation", "end-of-dollar"] as readonly string[],
   // --- spend process (§3.3) --------------------------------------------------
-  cac_scale: 0.9, // global CAC trim → lands total subs in the 50–65k band
+  cac_scale: 1.05, // global CAC trim → lands total subs in the 50–65k band
   cac_noise_sigma: 0.12,
   fatigue_per_week: 0.015, // creative fatigue raises CAC over reuse
   fatigue_cap: 1.25,
@@ -164,10 +164,11 @@ export const TUNING = {
   combo_sigma: 0.25,
   atom_sigma: 0.3,
   combo_unit_c: 150_00, // ≈$150 of weekly budget supports one live combo
-  max_combos_week: 10,
-  atom_unit_c: 400_00, // atom count grows log2 with combo budget
+  max_combos_week: 14,
+  atom_unit_c: 200_00, // atom count grows log2 with combo budget
+  max_atoms: 10,
   min_campaign_week_c: 40_00, // below ≈$40/wk a campaign-week goes dark
-  min_row_spend_c: 2_00,
+  min_row_spend_c: 1_00,
   activity_share_mult: 60, // P(active) = clamp(share·60, floor, 1)
   activity_floor: 0.55,
   managed_campaign_p: 0.1, // share of campaigns on the managed-money offer

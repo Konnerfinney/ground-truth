@@ -532,10 +532,13 @@ describe("imputeLtvPerDollar", () => {
   const baseline = { mean_ltv_c: 20_00, buyer_mean_rev_c: 40_00, n_mature: 1000, n_buyers: 500 };
   const dims = { audience: "retirement", creative: "education" } as const;
 
-  it("computes composed LTV ÷ mean sibling CPL", () => {
-    // composed = 2000 × (40+15)/40 × (40+10)/40 = 3437.5c; mean CPL = 3000c
+  it("computes damped composed LTV ÷ mean sibling CPL", () => {
+    // composed = 2000 × ((40+15)/40)^d × ((40+10)/40)^d, d = impute_damping;
+    // mean CPL = 3000c
+    const d = THRESHOLDS.impute_damping;
+    const expected = (2000 * Math.pow(55 / 40, d) * Math.pow(50 / 40, d)) / 3000;
     const v = imputeLtvPerDollar(dims, effects, [2500, 3500], baseline);
-    expect(v).toBeCloseTo(3437.5 / 3000, 10);
+    expect(v).toBeCloseTo(expected, 10);
   });
 
   it("DIRECTION: halving sibling CPL doubles the imputed LTV-per-dollar", () => {
