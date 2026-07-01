@@ -35,8 +35,9 @@ export const DIM_BIT: Record<DimName, number> = {
 
 /**
  * Delivery hierarchy H0–H4 (platform → account → campaign → audience →
- * creative). Empirical-Bayes parents are found by clearing the DEEPEST set
- * hierarchy bit; facet/time bits ride along unchanged.
+ * creative). NOTE: empirical-Bayes parents are NOT derived from bits — the
+ * explicit parent table in config.ts (grain registry) is authoritative
+ * (SPEC §6.2; the bit-rule was a confirmed v1.0 blocker).
  */
 export const HIERARCHY_BITS = [0, 1, 2, 3, 4] as const;
 
@@ -78,26 +79,3 @@ export function projectDims(full: Record<DimName, string>, mask: number): Dims {
   return out;
 }
 
-/**
- * EB parent of a cell: clear the deepest set hierarchy bit. Returns null at
- * the global row (no hierarchy bits set → nothing to fall back to).
- */
-export function parentOf(dims: Dims): { dims: Dims; mask: number } | null {
-  const mask = grainMask(Object.keys(dims) as DimName[]);
-  let deepest = -1;
-  for (const bit of HIERARCHY_BITS) {
-    if (mask & (1 << bit)) deepest = bit;
-  }
-  if (deepest < 0) {
-    // facet/time-only cell: parent is the global row unless we ARE global
-    if (mask === 0) return null;
-    const gDims: Dims = {};
-    return { dims: gDims, mask: 0 };
-  }
-  const parentMask = mask & ~(1 << deepest);
-  const out: Dims = {};
-  for (const d of DIM_NAMES) {
-    if (parentMask & (1 << DIM_BIT[d])) out[d] = dims[d];
-  }
-  return { dims: out, mask: parentMask };
-}

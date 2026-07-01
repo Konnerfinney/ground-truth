@@ -5,7 +5,6 @@ import {
   cellKey,
   grainMask,
   maskDims,
-  parentOf,
   projectDims,
   type Dims,
 } from "@/engine/dims";
@@ -70,34 +69,6 @@ describe("cellKey", () => {
   });
 });
 
-describe("parentOf (EB fallback chain)", () => {
-  it("clears the deepest hierarchy bit and keeps facets", () => {
-    const leaf: Dims = {
-      platform: "meta",
-      ad_account: "act_1",
-      campaign: "cmp_9",
-      audience: "retirement",
-      creative: "hype-10x",
-      geo: "FL",
-    };
-    const p1 = parentOf(leaf)!;
-    expect(maskDims(p1.mask)).toEqual(["platform", "ad_account", "campaign", "audience", "geo"]);
-    expect(p1.dims.geo).toBe("FL");
-    expect(p1.dims.creative).toBeUndefined();
-  });
-
-  it("walks the full chain to global", () => {
-    let cur: Dims = { platform: "meta", ad_account: "act_1", campaign: "cmp_9" };
-    const chain: number[] = [];
-    for (let step = parentOf(cur); step; step = parentOf(cur)) {
-      chain.push(step.mask);
-      cur = step.dims;
-    }
-    expect(chain).toEqual([0b011, 0b001, 0b000]);
-  });
-
-  it("facet-only cells fall back to global; global has no parent", () => {
-    expect(parentOf({ geo: "FL" })!.mask).toBe(0);
-    expect(parentOf({})).toBeNull();
-  });
-});
+// EB parent lookup is table-driven via the grain registry — covered in
+// tests/config.test.ts (closure, subset, termination). The old bit-clearing
+// parentOf was removed as a confirmed spec-review blocker.
