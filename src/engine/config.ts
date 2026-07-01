@@ -82,7 +82,13 @@ export const THRESHOLDS = {
   z80: 1.2816, // 80% interval multiplier
   spend_material_q: 0.5, // within-grain quantiles of nonzero spend_day
   spend_high_q: 0.75,
-  spend_starved_q: 0.2,
+  /**
+   * Starved rule (supersedes the v1.1 p20 quantile, which degenerates in a
+   * Zipf tail): a cell is starved when its spend is under starved_frac × the
+   * MEDIAN spend of funded cells (n ≥ n_floor) in the same grain — "it gets
+   * less than a quarter of what a typical funded cell gets."
+   */
+  starved_frac: 0.25,
   ridge_lambda: 1.0,
   logistic_lambda: 1.0,
   holdout_frac: 0.2, // mature-sub holdout for out-of-sample charts
