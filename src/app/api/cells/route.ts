@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DIM_NAMES, type DimName } from "@/engine/dims";
-import { availableGrains, queryCells } from "@/engine/query";
+import { queryCells } from "@/engine/query";
 import { GrainNotAvailable } from "@/engine/types";
 import { loadArtifacts } from "@/lib/artifacts";
 
