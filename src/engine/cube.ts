@@ -191,14 +191,13 @@ export function buildCube(
       curves.set(`${g.name}:${key}`, curve);
 
       const cpl_c = n > 0 ? a.spend_c / n : 0;
+      // Payback = the day cumulative revenue crosses cost AND STAYS above it.
+      // Impulse cells spike over the line on day 1 and get refunded back
+      // under it — that is not payback, that is the flip.
       let payback_day: number | null = null;
-      if (n > 0 && cpl_c > 0) {
-        for (let d = 0; d <= 90; d++) {
-          if (curve[d] >= cpl_c) {
-            payback_day = d;
-            break;
-          }
-        }
+      if (n > 0 && cpl_c > 0 && curve[90] >= cpl_c) {
+        payback_day = 90;
+        for (let d = 90; d >= 0 && curve[d] >= cpl_c; d--) payback_day = d;
       }
 
       const row: CubeRow = {

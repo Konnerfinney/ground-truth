@@ -18,7 +18,7 @@ export default async function BriefPage() {
   const data = await loadArtifacts();
   const { brief } = data;
   const global = data.rows.find((r) => r.grain === "global")!;
-  const flips = data.rows.filter((r) => r.is_flip).length;
+  const flipMoves = brief.cards.filter((c) => c.is_flip).length;
 
   const groups = GROUP_ORDER.map((v) => ({
     verdict: v,
@@ -39,7 +39,7 @@ export default async function BriefPage() {
         />
         <StatTile label="Bleeding" value={`${usd(brief.headline_bleed_c)}/day`} sub="measured, across kill/trim cells" tone="kill" />
         <StatTile label="Potential upside" value={`+${usd(brief.headline_upside_c)}/day`} sub="naive marginal estimate, unverified" tone="scale" />
-        <StatTile label="Flips caught" value={String(flips)} sub="platform winners that truly lose" tone="untapped" />
+        <StatTile label="Flips in today's moves" value={String(flipMoves)} sub="platform winners that truly lose" tone="untapped" />
       </section>
 
       {/* Headline */}

@@ -1,11 +1,15 @@
 /** Money and metric formatting — integer cents in, human strings out. */
 
 export function usd(cents: number, opts: { compact?: boolean } = {}): string {
-  const dollars = cents / 100;
-  if (opts.compact && Math.abs(dollars) >= 10_000) {
-    return `$${(dollars / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 })}k`;
+  const sign = cents < 0 ? "−" : "";
+  const dollars = Math.abs(cents) / 100;
+  if (opts.compact && dollars >= 1_000_000) {
+    return `${sign}$${(dollars / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 2 })}M`;
   }
-  return `$${Math.round(dollars).toLocaleString("en-US")}`;
+  if (opts.compact && dollars >= 10_000) {
+    return `${sign}$${(dollars / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 })}k`;
+  }
+  return `${sign}$${Math.round(dollars).toLocaleString("en-US")}`;
 }
 
 export function usdExact(cents: number): string {

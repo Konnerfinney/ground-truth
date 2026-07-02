@@ -107,7 +107,7 @@ export function BulletBar({
 export function Dumbbell({ platformRoas, truth, max = 3.5 }: { platformRoas: number; truth: number; max?: number }) {
   const w = 220;
   const h = 26;
-  const x = (v: number) => 8 + Math.min(1, Math.max(0, v / max)) * (w - 16);
+  const x = (v: number) => 26 + Math.min(1, Math.max(0, v / max)) * (w - 52);
   const y = h / 2;
   const diverges = platformRoas > truth;
   return (

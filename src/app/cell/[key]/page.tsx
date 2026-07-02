@@ -64,8 +64,14 @@ export default async function CellPage({ params }: { params: Promise<{ key: stri
           sub={`front-end ${usd(cell.fe_rev_c, { compact: true })} · back-end ${usd(cell.be_rev_c, { compact: true })}`}
         />
         <StatTile
-          label="Payback"
-          value={cell.payback_day !== null ? `day ${cell.payback_day}` : "not yet"}
+          label="Payback (sustained)"
+          value={
+            cell.payback_day !== null
+              ? `day ${cell.payback_day}`
+              : cell.maturity_frac > 0.6
+                ? "none by d90"
+                : "not yet"
+          }
           sub={`maturity ${pct(cell.maturity_frac)} · confidence ${pct(cell.confidence)}`}
         />
       </section>
@@ -148,29 +154,42 @@ export default async function CellPage({ params }: { params: Promise<{ key: stri
 
 function PaybackSvg({ cum, cac }: { cum: number[]; cac: number }) {
   const w = 720;
-  const h = 180;
-  const pad = { l: 44, r: 12, t: 10, b: 22 };
+  const h = 190;
+  const pad = { l: 44, r: 12, t: 24, b: 22 };
   const maxY = Math.max(cac * 1.4, ...cum) || 1;
   const x = (i: number) => pad.l + (i / (cum.length - 1)) * (w - pad.l - pad.r);
   const y = (v: number) => h - pad.b - (v / maxY) * (h - pad.t - pad.b);
   const points = cum.map((v, i) => `${x(i)},${y(v)}`).join(" ");
-  const crossIdx = cum.findIndex((v) => v >= cac);
+  // Sustained crossing only — spiking over the line and refunding back under
+  // it is the flip, not payback.
+  const sustained = cum.length > 0 && cum[cum.length - 1] >= cac;
+  let crossIdx = -1;
+  if (sustained) {
+    crossIdx = cum.length - 1;
+    while (crossIdx > 0 && cum[crossIdx - 1] >= cac) crossIdx--;
+  }
+  const fakePeak = !sustained && Math.max(...cum) >= cac;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto" role="img" aria-label="Payback curve">
       {/* CAC reference line */}
       <line x1={pad.l} x2={w - pad.r} y1={y(cac)} y2={y(cac)} stroke="var(--kill)" strokeDasharray="4 4" strokeOpacity={0.7} />
-      <text x={w - pad.r} y={y(cac) - 5} textAnchor="end" fontSize={10} fill="var(--kill)">
+      <text x={w - pad.r} y={Math.max(12, y(cac) - 5)} textAnchor="end" fontSize={10} fill="var(--kill)">
         cost per subscriber {`$${Math.round(cac / 100)}`}
       </text>
       {/* revenue curve */}
-      <polyline points={points} fill="none" stroke="var(--scale)" strokeWidth={2} />
+      <polyline points={points} fill="none" stroke={sustained ? "var(--scale)" : "var(--kill)"} strokeWidth={2} strokeOpacity={sustained ? 1 : 0.8} />
       {crossIdx > 0 && (
         <>
           <circle cx={x(crossIdx)} cy={y(cum[crossIdx])} r={4} fill="var(--scale)" />
-          <text x={x(crossIdx)} y={y(cum[crossIdx]) - 8} textAnchor="middle" fontSize={10} fill="var(--scale)">
+          <text x={x(crossIdx)} y={Math.max(12, y(cum[crossIdx]) - 8)} textAnchor="middle" fontSize={10} fill="var(--scale)">
             payback
           </text>
         </>
+      )}
+      {fakePeak && (
+        <text x={x(cum.indexOf(Math.max(...cum)))} y={Math.max(12, y(Math.max(...cum)) - 8)} textAnchor="middle" fontSize={10} fill="var(--kill)">
+          crosses, then refunds claw it back — never pays back
+        </text>
       )}
       {/* axis labels */}
       {[0, 30, 60, 90].map((d) => (
