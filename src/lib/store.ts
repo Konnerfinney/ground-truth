@@ -17,7 +17,9 @@ async function build(): Promise<GroundTruthStore> {
       import("postgres"),
       import("./pg/pgstore"),
     ]);
-    const sql = postgres(url, { max: 5 });
+    // prepare:false → compatible with transaction-mode poolers (Supabase
+    // Supavisor, pgBouncer), which don't support prepared statements.
+    const sql = postgres(url, { max: 5, prepare: false });
     return pgStore(async (text, params = []) => ({
       rows: (await sql.unsafe(text, params as never[])) as unknown as Record<string, unknown>[],
     }));

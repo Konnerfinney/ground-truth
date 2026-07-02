@@ -15,7 +15,9 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = postgres(url, { max: 1 });
+// max:1 keeps the staging-schema search_path on one session; prepare:false
+// works through transaction-mode poolers (Supabase Supavisor, pgBouncer).
+const sql = postgres(url, { max: 1, prepare: false });
 const t0 = performance.now();
 
 const exec = async (text: string, params: unknown[] = []) => ({
