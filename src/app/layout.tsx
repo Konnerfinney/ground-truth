@@ -46,12 +46,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </Link>
             </nav>
             <div className="ml-auto flex items-center gap-3">
-              <span
-                className="text-[11px] px-2.5 py-1 rounded-full border border-untapped/40 text-untapped bg-untapped/10"
-                title="Every number on this dashboard comes from a documented, seeded synthetic data generator. Methodology drawer ships with Cell Detail."
+              <Link
+                href="/methodology"
+                className="text-[11px] px-2.5 py-1 rounded-full border border-untapped/40 text-untapped bg-untapped/10 hover:bg-untapped/20"
+                title="Every number here is synthetic by design — click for the full methodology, the planted answer key, and the recovery proof."
               >
-                ⚗ Synthetic demo data
-              </span>
+                ⚗ Synthetic demo data — methodology
+              </Link>
             </div>
           </div>
         </header>
