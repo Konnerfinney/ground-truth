@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { AuthChip } from "@/components/auth/AuthChip";
 import { CartBadge } from "@/components/cart/CartClient";
 import "./globals.css";
 
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </Link>
             </nav>
             <div className="order-2 sm:order-3 ml-auto flex items-center gap-2 sm:gap-3 min-w-0">
+              <AuthChip />
               <CartBadge />
               <Link
                 href="/methodology"

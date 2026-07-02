@@ -14,6 +14,7 @@
     "db:load": "tsx scripts/db-load.ts"
   },
   "dependencies": {
+    "jose": "^6.2.3",
     "lucide-react": "^1.23.0",
     "mcp-handler": "^1.1.0",
     "next": "16.2.10",

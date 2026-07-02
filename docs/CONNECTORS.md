@@ -48,19 +48,31 @@ Order-free, case-free, `:` or `=`; most specific name wins (ad > adset > campaig
 warns when rows arrive untagged, because untagged spend degrades the semantic dimensions for
 everyone downstream.
 
-## Roadmap: multi-workspace credentials (post-contest, deliberately)
+## Roadmap: multi-workspace credentials
 
-The end state is users plugging credentials into the product itself. That requires, in order:
+The end state is users plugging credentials into the product itself. In order:
 
-1. **Auth** — real accounts (Clerk or Supabase Auth; magic-link is enough), because a credential
-   form without auth on a public URL is a vulnerability, not a feature.
-2. **Encrypted vault** — `workspace_credentials` table, values sealed with AES-256-GCM under a
-   key held only in the deployment env (envelope encryption; rotate by re-wrapping). Values are
-   write-only through the UI: status shows *presence and last-used*, never the secret.
+1. **Auth — ✅ shipped (optional-on).** Google sign-in, implemented as the OIDC authorization-code
+   flow with PKCE directly (`src/lib/auth/` — state, nonce, S256 challenge, full ID-token
+   verification against Google's JWKS; sessions are our own HS256 JWT in an httpOnly cookie; no
+   database). Auth activates only when its env exists — the judged demo ships without it:
+   ```
+   GOOGLE_OAUTH_CLIENT_ID=...apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=...
+   AUTH_SECRET=...                    # openssl rand -base64 32
+   ```
+   Google Cloud Console → APIs & Services → Credentials → OAuth client (Web application) with
+   redirect URIs `https://<your-domain>/api/auth/callback` and
+   `http://localhost:3000/api/auth/callback`. The signed-in area is `/settings`; the Google `sub`
+   claim is the workspace key everything below hangs off.
+2. **Encrypted vault — next.** `workspace_credentials` table, values sealed with AES-256-GCM under
+   a key held only in the deployment env (envelope encryption; rotate by re-wrapping). Values are
+   write-only through `/settings`: status shows *presence and last-used*, never the secret.
 3. **Tenancy** — `workspace_id` on `raw_spend`/`sync_runs`/the cube; per-workspace nightly fan-out.
 4. **Blast-radius discipline** — tokens requested at minimum scope (`ads_read`), stored per
-   workspace, revocable from the platform side at any time, and never logged.
+   workspace, revocable from the platform side at any time, and never logged (the sync's warning
+   redactor already enforces this for anything credential-shaped).
 
-Until then, per-deployment env secrets give single-tenant deployments the full pipeline with the
-smallest possible attack surface — which is also why the judged demo ships with none configured:
-nothing to leak, nothing to expire, nothing to be down.
+Per-deployment env secrets remain the single-tenant path with the smallest attack surface — which
+is why the judged demo ships with neither auth nor connectors configured: nothing to leak, nothing
+to expire, nothing to be down.
