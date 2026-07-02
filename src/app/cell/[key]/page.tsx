@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AddToProposal } from "@/components/cart/CartClient";
+import { cartItemFor } from "@/components/cart/item";
 import { BulletBar, Dumbbell, MaturityBadge, StatTile, VerdictBadge } from "@/components/viz";
 import { getCell } from "@/engine/query";
 import { loadArtifacts } from "@/lib/artifacts";
@@ -31,6 +33,7 @@ export default async function CellPage({ params }: { params: Promise<{ key: stri
         <div className="flex flex-wrap items-center gap-4">
           <VerdictBadge verdict={cell.verdict} leaning={cell.leaning} isFlip={cell.is_flip} />
           <h1 className="text-2xl font-semibold">{cellPath(cell.dims)}</h1>
+          <span className="ml-auto">{cartItemFor(cell) && <AddToProposal item={cartItemFor(cell)!} />}</span>
         </div>
         <p className="text-sm text-muted max-w-3xl leading-relaxed">{cell.reason}</p>
       </header>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { CartBadge } from "@/components/cart/CartClient";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </Link>
             </nav>
             <div className="ml-auto flex items-center gap-3">
+              <CartBadge />
               <Link
                 href="/methodology"
                 className="text-[11px] px-2.5 py-1 rounded-full border border-untapped/40 text-untapped bg-untapped/10 hover:bg-untapped/20"

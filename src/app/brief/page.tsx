@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { AddToProposal } from "@/components/cart/CartClient";
+import { cartItemFor } from "@/components/cart/item";
 import { BulletBar, Dumbbell, ImpactMoney, MaturityBadge, StatTile, VerdictBadge } from "@/components/viz";
 import type { BriefCard, CubeRow, Verdict } from "@/engine/types";
 import { loadArtifacts } from "@/lib/artifacts";
@@ -121,9 +123,12 @@ function DecisionCard({ card, row }: { card: BriefCard; row: CubeRow }) {
             also visible at {card.also_visible_at.length} other grain{card.also_visible_at.length > 1 ? "s" : ""}
           </span>
         )}
-        <Link href={explorerHref(row)} className="ml-auto text-muted hover:text-foreground">
-          open in Explorer →
-        </Link>
+        <span className="ml-auto flex items-center gap-3">
+          {cartItemFor(row) && <AddToProposal item={cartItemFor(row)!} />}
+          <Link href={explorerHref(row)} className="text-muted hover:text-foreground">
+            open in Explorer →
+          </Link>
+        </span>
       </div>
     </div>
   );
