@@ -57,7 +57,7 @@ export function CartBadge() {
   const [items] = useCart();
   if (items.length === 0)
     return (
-      <Link href="/proposal" className="text-[11px] text-faint hover:text-foreground">
+      <Link href="/proposal" className="text-[11px] text-faint hover:text-foreground whitespace-nowrap">
         proposal: empty
       </Link>
     );
@@ -65,7 +65,7 @@ export function CartBadge() {
   return (
     <Link
       href="/proposal"
-      className="text-[11px] px-2.5 py-1 rounded-full border border-scale/40 text-scale bg-scale/10 hover:bg-scale/20"
+      className="text-[11px] px-2.5 py-1 rounded-full border border-scale/40 text-scale bg-scale/10 hover:bg-scale/20 whitespace-nowrap"
     >
       proposal: {items.length} move{items.length > 1 ? "s" : ""} · ~${Math.round(net).toLocaleString("en-US")}/day
     </Link>
@@ -141,7 +141,7 @@ export function ProposalList() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-line overflow-hidden">
+      <div className="rounded-xl border border-line overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-surface text-left text-xs text-muted">

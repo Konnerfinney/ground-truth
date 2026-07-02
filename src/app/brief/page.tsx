@@ -116,7 +116,7 @@ function DecisionCard({ card, row }: { card: BriefCard; row: CubeRow }) {
 
       <p className="mt-3 text-sm text-muted leading-relaxed">{card.reason}</p>
 
-      <div className="mt-2 flex items-center gap-4 text-[11px] text-faint">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-faint">
         <span>covers {card.covered_leaves.toLocaleString("en-US")} live cells</span>
         {card.also_visible_at.length > 0 && (
           <span title="The same dollars, seen from other grains — corroboration, not double-counting.">

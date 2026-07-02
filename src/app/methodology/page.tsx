@@ -98,7 +98,7 @@ export default async function MethodologyPage() {
           cannot represent (whale gating, zero-inflation, refund dynamics, heavy tails, censoring).
           Recovery validates <i>pipeline correctness</i>, not model-family choice:
         </P>
-        <div className="grid grid-cols-3 gap-3 my-4">
+        <div className="grid sm:grid-cols-3 gap-3 my-4">
           <Metric label="Value effects recovered" value={recovery.value_corr.toFixed(2)} sub="corr vs planted ln(m_ltv), materially planted levels" />
           <Metric label="Conversion effects recovered" value={recovery.conv_corr.toFixed(2)} sub="corr vs planted ln(m_feconv)" />
           <Metric label="Negative control" value={recovery.negative_control_corr.toFixed(2)} sub="corr vs a PERMUTED answer key — should be ≈ 0" />

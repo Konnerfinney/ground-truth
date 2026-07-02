@@ -127,7 +127,7 @@ export default async function CellPage({ params }: { params: Promise<{ key: stri
       {children_preview.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-muted">Inside this cell</h2>
-          <div className="rounded-xl border border-line overflow-hidden">
+          <div className="rounded-xl border border-line overflow-x-auto">
             <table className="w-full text-sm">
               <tbody>
                 {children_preview.map((c) => (
