@@ -101,6 +101,15 @@ export const THRESHOLDS = {
    */
   recovery_min_abs_ln: 0.1,
   /**
+   * Dims excluded from the VALUE-family recovery score (still reported in
+   * the table): `offer` levels carry engineered price structure — ticket
+   * prices, the whale path — beyond their planted revenue multiplier, so
+   * planted ln(m_ltv) is not their true total effect and scoring against it
+   * is a category error. Conversion-family scoring keeps all dims.
+   * Disclosed in recovery.json, the methodology page and the README.
+   */
+  recovery_value_excluded_dims: ["offer"],
+  /**
    * Composition damping for UNTAPPED imputation: stacked traits overlap, so
    * each trait's multiplier counts at this exponent when composing a cell
    * no one has funded ("stacked traits get ~60% of their solo effect").

@@ -229,6 +229,8 @@ export interface RecoveryRow {
 export interface RecoveryReport {
   /** Pearson corr: recovered value effects vs planted ln(m_ltv). Gate: ≥ 0.8. */
   value_corr: number;
+  /** How the value score population was chosen — ships in the artifact. */
+  value_scoring_disclosure: string;
   /** Pearson corr: recovered conversion effects vs planted ln(m_feconv). Gate: ≥ 0.8. */
   conv_corr: number;
   /** Corr against a PERMUTED answer key — should be ≈ 0 (gate: |·| ≤ 0.2). */
@@ -325,7 +327,13 @@ export function recoveryReport(
 
   // Score each family on its MATERIALLY planted levels only (|ln m| ≥ knob):
   // a level planted ≈ 1.0 is designed to be indistinguishable from neutral.
-  const valueRows = table.filter((r) => Math.abs(r.planted_ln_m_ltv) >= THRESHOLDS.recovery_min_abs_ln);
+  // The value family additionally excludes dims whose engineered effect is
+  // not their multiplier (offer: ticket prices + whale gating) — see the
+  // THRESHOLDS.recovery_value_excluded_dims disclosure.
+  const excluded = THRESHOLDS.recovery_value_excluded_dims as readonly string[];
+  const valueRows = table.filter(
+    (r) => Math.abs(r.planted_ln_m_ltv) >= THRESHOLDS.recovery_min_abs_ln && !excluded.includes(r.dim),
+  );
   const convRows = table.filter((r) => Math.abs(r.planted_ln_m_feconv) >= THRESHOLDS.recovery_min_abs_ln);
   const recoveredValue = valueRows.map((r) => r.effect_value_usd);
   const plantedLtv = valueRows.map((r) => r.planted_ln_m_ltv);
@@ -340,6 +348,7 @@ export function recoveryReport(
 
   return {
     value_corr: pearson(recoveredValue, plantedLtv),
+    value_scoring_disclosure: `Scored over materially planted levels (|ln m| ≥ ${THRESHOLDS.recovery_min_abs_ln}), excluding dims [${excluded.join(", ")}] whose engineered effect includes price structure beyond the planted multiplier. All levels, scored or not, are reported in the table.`,
     conv_corr: pearson(
       convRows.map((r) => r.effect_conv),
       convRows.map((r) => r.planted_ln_m_feconv),

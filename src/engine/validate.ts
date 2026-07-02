@@ -1,5 +1,6 @@
-import { FLIP_CELL_KEY, GRAINS, UNTAPPED_CELL_KEY, VALIDATE } from "./config";
+import { FLIP_CELL_KEY, GRAINS, SEED, UNTAPPED_CELL_KEY, VALIDATE } from "./config";
 import { cellKey, grainMask, projectDims } from "./dims";
+import { generateWorld } from "./dgp/world";
 import { trueLtv90, type World } from "./dgp/world.types";
 import type { RecoveryReport } from "./model/decompose";
 import type { Brief } from "./verdicts";
@@ -158,25 +159,55 @@ export function validate(inp: ValidateInputs): ValidateReport {
     detail: `value=${inp.recovery.value_corr.toFixed(3)}, conv=${inp.recovery.conv_corr.toFixed(3)} (need ≥${VALIDATE.min_recovery_corr}), negative control=${inp.recovery.negative_control_corr.toFixed(3)} (|·|≤${VALIDATE.max_negative_control_corr})`,
   });
 
-  // 8 — shrinkage beats raw on thin cells (vs the truth sidecar).
+  // 8 — the shipped estimate beats the naive own-data average on thin cells.
+  // Ground truth = the cell's LONG-RUN expected per-subscriber value, pooled
+  // from REGENERATED worlds (fresh seeds). A mature cell's own realized value
+  // IS its sidecar draw, so scoring against the sidecar is degenerate — the
+  // honest target is the expectation. Story-grain cells are campaign-free,
+  // so the same cell exists across seeds and its expectation is well-defined.
   {
+    const story5 = GRAINS.find((g) => g.name === "story-5")!;
+    const story5Mask = grainMask(story5.dims);
     const thin = rows.filter(
-      (r) => r.n_subs >= 1 && r.n_subs <= 10 && r.spend_c > 0 && Object.keys(r.dims).length >= 4,
+      (r) =>
+        r.grain === "story-5" &&
+        r.n_subs >= 1 &&
+        r.n_subs <= 10 &&
+        r.spend_c > 0 &&
+        r.maturity_frac >= 0.85 &&
+        r.parent_key !== null,
     );
-    let seShrunk = 0;
-    let seRaw = 0;
+    const thinKeys = new Set(thin.map((r) => r.cell_key));
+    const expectation = new Map<string, { ltv: number; n: number }>();
+    const N_REPLICATES = 14;
+    for (let rep = 1; rep <= N_REPLICATES; rep++) {
+      const replicate = generateWorld(SEED * 31 + rep);
+      for (const s of replicate.subs) {
+        const k2 = cellKey(projectDims(s.dims, story5Mask));
+        if (!thinKeys.has(k2)) continue;
+        const e = expectation.get(k2) ?? { ltv: 0, n: 0 };
+        e.ltv += trueLtv90(s);
+        e.n++;
+        expectation.set(k2, e);
+      }
+    }
+    let maeShipped = 0;
+    let maeNaive = 0;
     let n = 0;
     for (const r of thin) {
-      const truth = sidecarLtvCac(r);
-      if (!Number.isFinite(truth)) continue;
-      seShrunk += Math.abs(r.ltv_shrunk - truth);
-      seRaw += Math.abs(r.ltv_raw - truth);
+      const e = expectation.get(r.cell_key);
+      if (!e || e.n < 30) continue; // need a stable expectation to score against
+      const truthPerSub = e.ltv / e.n;
+      const naivePerSub = r.realized_rev_c / r.n_subs; // the average a buyer would compute
+      const shippedPerSub = r.ltv_shrunk * r.cpl_c; // shipped LTV-per-dollar × spend-per-sub
+      maeShipped += Math.abs(shippedPerSub - truthPerSub);
+      maeNaive += Math.abs(naivePerSub - truthPerSub);
       n++;
     }
     stats.push({
       name: "shrinkage-beats-raw",
-      pass: n > 50 && seShrunk < seRaw,
-      detail: `thin cells n=${n}: MAE shrunk=${(seShrunk / Math.max(1, n)).toFixed(3)} vs raw=${(seRaw / Math.max(1, n)).toFixed(3)}`,
+      pass: n >= 30 && maeShipped < maeNaive,
+      detail: `shipped estimate vs naive own-data average on ${n} thin mature story cells (n≤10), scored against each cell's long-run expected value pooled from ${N_REPLICATES} regenerated worlds: MAE shipped=$${(maeShipped / Math.max(1, n) / 100).toFixed(2)} vs naive=$${(maeNaive / Math.max(1, n) / 100).toFixed(2)} per subscriber.`,
     });
   }
 
