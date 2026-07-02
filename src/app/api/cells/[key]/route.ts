@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
-import { getCell } from "@/engine/query";
-import { loadArtifacts } from "@/lib/artifacts";
+import { getStore } from "@/lib/store";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ key: string }> }) {
   const { key } = await ctx.params;
-  const data = await loadArtifacts();
-  const detail = getCell(data, key);
+  const store = await getStore();
+  const detail = await store.getCell(key);
   if (!detail) {
+    const meta = await store.meta();
     return NextResponse.json(
       {
         error: "cell_not_found",
         requested: key,
         note: "Cell keys are content-addressed and survive regeneration; this key matches no materialized cell.",
         try: {
-          flip_cell: data.meta.flip_cell_key,
-          untapped_cell: data.meta.untapped_cell_key,
+          flip_cell: meta.flip_cell_key,
+          untapped_cell: meta.untapped_cell_key,
         },
       },
       { status: 404 },

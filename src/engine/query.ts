@@ -122,7 +122,7 @@ export function getCell(data: QueryData, key: string): CellDetail | null {
   const effects_for_dims = data.effects.filter((e) => pinned.has(`${e.dim}=${e.level}`));
   const children_preview = data.rows
     .filter((r) => r.parent_key === key)
-    .sort((a, b) => b.spend_c - a.spend_c)
+    .sort((a, b) => b.spend_c - a.spend_c || a.cell_key.localeCompare(b.cell_key))
     .slice(0, 10);
   const parent_chain: CubeRow[] = [];
   let cur = cell.parent_key;
@@ -142,7 +142,9 @@ export function getCell(data: QueryData, key: string): CellDetail | null {
 }
 
 export function drillDown(data: QueryData, key: string): CubeRow[] {
-  return data.rows.filter((r) => r.parent_key === key).sort((a, b) => b.spend_c - a.spend_c);
+  return data.rows
+    .filter((r) => r.parent_key === key)
+    .sort((a, b) => b.spend_c - a.spend_c || a.cell_key.localeCompare(b.cell_key));
 }
 
 export function dailyBrief(data: QueryData): BriefArtifact {
@@ -152,11 +154,11 @@ export function dailyBrief(data: QueryData): BriefArtifact {
 export function listFlips(data: QueryData, minImpact_c = 0): CubeRow[] {
   return data.rows
     .filter((r) => r.is_flip && r.dollar_impact_day_c >= minImpact_c)
-    .sort((a, b) => b.dollar_impact_day_c - a.dollar_impact_day_c);
+    .sort((a, b) => b.dollar_impact_day_c - a.dollar_impact_day_c || a.cell_key.localeCompare(b.cell_key));
 }
 
 export function findUntapped(data: QueryData): CubeRow[] {
   return data.rows
     .filter((r) => r.verdict === "UNTAPPED")
-    .sort((a, b) => b.dollar_impact_day_c - a.dollar_impact_day_c);
+    .sort((a, b) => b.dollar_impact_day_c - a.dollar_impact_day_c || a.cell_key.localeCompare(b.cell_key));
 }

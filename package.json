@@ -10,12 +10,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate": "tsx scripts/generate.ts"
+    "generate": "tsx scripts/generate.ts",
+    "db:load": "tsx scripts/db-load.ts"
   },
   "dependencies": {
     "lucide-react": "^1.23.0",
     "mcp-handler": "^1.1.0",
     "next": "16.2.10",
+    "postgres": "^3.4.9",
     "pure-rand": "^8.4.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -23,6 +25,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

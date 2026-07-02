@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import { dailyBrief } from "@/engine/query";
-import { loadArtifacts } from "@/lib/artifacts";
+import { getStore } from "@/lib/store";
 
 export async function GET() {
-  const data = await loadArtifacts();
-  const brief = dailyBrief(data);
+  const store = await getStore();
+  const [brief, meta] = await Promise.all([store.dailyBrief(), store.meta()]);
   return NextResponse.json({
     ...brief,
     snapshot_meta: {
-      snapshot_at: data.meta.snapshot_at,
-      seed: data.meta.seed,
-      source: data.meta.source,
-      cube_rows: data.rows.length,
+      snapshot_at: meta.snapshot_at,
+      seed: meta.seed,
+      source: meta.source,
     },
   });
 }

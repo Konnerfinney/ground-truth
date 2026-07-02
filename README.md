@@ -176,13 +176,20 @@ A few rules hold everywhere, because trust is the product:
 - **Every number explainable in a sentence or two.** If a method can't be explained to a media buyer in plain English, it doesn't ship. The methodology page carries the one-sentence gloss next to every formula.
 - **Money is integer cents internally.** Formatting happens at the edge; rounding errors don't compound.
 
-### Production path
+### The data layer — built, not promised
 
-The demo swaps in synthetic data where production would have an ingestion rail. The swap points are explicit, and nothing downstream of the artifacts changes:
+At production scale this product *is* a data problem: millions of subscribers, event-level revenue streams, a cube rebuilt nightly. So the storage seam isn't a paragraph in this README — it's implemented and parity-tested in the repo:
 
-- **The join, made free at click time:** a `/c` edge redirect stamps every outbound click with a click-id carrying the full cell definition before the visitor ever hits the lander; a `/postback` endpoint receives subscription, renewal, refund, and affiliate-payout events keyed to that click-id. That one rail replaces the entire "which ad bought this subscriber" forensics problem.
-- **Storage:** in-memory arrays → DuckDB for the nightly cube build → Postgres for serving. The artifact schema is the contract; only the producer changes.
-- **Model:** the transparent two-part GLM → LightGBM (Tweedie/quantile) once real volume earns it — same features, same calibration discipline, better tails. The GLM ships first because every number it produces can be explained in one sentence.
+- **One interface, two stores.** `GroundTruthStore` (`src/engine/store.ts`) is the only way anything reads data. The demo default serves from baked artifacts; `src/lib/pg/` implements the identical interface against **Postgres** — filtering, ranking, and the parent-chain walk (a recursive CTE) pushed into SQL, with the production DDL and indexes in `src/lib/pg/schema.ts`.
+- **Proven equivalent, not claimed equivalent.** `tests/pgstore.test.ts` loads the artifacts into a real Postgres (PGlite — in-process, no Docker) and asserts both backends return **row-identical results** for the same contract calls: every query shape, the flip cell's full detail, the brief, the flips, the typed grain errors.
+- **The nightly-snapshot pattern, working:** `DATABASE_URL=... npm run db:load` builds the cube into a staging schema and swaps it atomically — readers never see a half-written world. `DATABASE_URL=... npm run dev` then serves the API and MCP from Postgres instead of artifacts. The deployed demo deliberately ships without a database — nothing that can be cold, paused, or down while a judge is clicking — but the flip is one env var.
+
+**Scaling shape** (why this design): the serving cube stays small even when the business is huge — ~23 curated grains over targeting vocabulary yields tens of thousands of rows whether you have 70k subscribers or 7M. What grows is the *event* side: clicks, opt-ins, revenue events. Production shape: event lake → **DuckDB** nightly cube build → **Postgres** (partitioned by grain, latest snapshots hot, older ones kept as the audit trail) → this exact store interface. Graduate the build to ClickHouse/BigQuery when event volume earns it; **the query contract never changes** — that's the point of the seam, and the parity suite is what keeps it honest.
+
+The other production swap points, same discipline:
+
+- **The join, made free at click time:** a `/c` edge redirect stamps every outbound click with a click-id carrying the full cell definition; a `/postback` endpoint receives subscription, renewal, refund, and affiliate-payout events keyed to it. That one rail replaces the entire "which ad bought this subscriber" forensics problem.
+- **Model:** the transparent two-part GLM → LightGBM (Tweedie/quantile) once real volume earns it — same features, same calibration discipline, better tails.
 - **Cadence:** build-time script → nightly snapshot job. The UI, the MCP server, and the query contract don't change at all.
 
 ---
@@ -245,11 +252,18 @@ Questions a veteran buyer should ask this tool — asked and answered up front:
 git clone https://github.com/Konnerfinney/ground-truth && cd ground-truth
 npm install
 npm run generate   # rebuilds every artifact from the seed — byte-identical, validate-gated (~10s)
-npm test           # 96 tests: engine, models, DGP bands, query contract
+npm test           # 103 tests: engine, models, DGP bands, query contract, pg↔memory parity
 npm run dev        # http://localhost:3000
 ```
 
-No env vars, no database, no accounts. `npm run lint` and `npm run typecheck` are the other two gates; all three run clean.
+No env vars, no database, no accounts required. To serve the identical contract from Postgres instead:
+
+```bash
+DATABASE_URL=postgres://... npm run db:load   # atomic staging-swap load (the nightly-snapshot pattern)
+DATABASE_URL=postgres://... npm run dev       # API + MCP now read from Postgres; parity-tested
+```
+
+`npm run lint` and `npm run typecheck` are the other two gates; all run clean.
 
 ## How this was built
 

@@ -2,16 +2,8 @@ import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { GRAINS, THRESHOLDS } from "@/engine/config";
 import { DIM_NAMES } from "@/engine/dims";
-import {
-  dailyBrief,
-  drillDown,
-  findUntapped,
-  getCell,
-  listFlips,
-  queryCells,
-} from "@/engine/query";
 import { GrainNotAvailable, type CubeRow } from "@/engine/types";
-import { loadArtifacts } from "@/lib/artifacts";
+import { getStore } from "@/lib/store";
 import { cellPath } from "@/lib/format";
 
 /**
@@ -84,9 +76,9 @@ const handler = createMcpHandler(
         min_confidence: z.number().min(0).max(1).optional().describe("Default 0.6; UNTAPPED rows are always included"),
       },
       async ({ grain, metric, filters, order, top_n, min_confidence }) => {
-        const data = await loadArtifacts();
+        const store = await getStore();
         try {
-          const { rows, applied } = queryCells(data, {
+          const { rows, applied } = await store.queryCells({
             grain,
             metric,
             filters: filters as Partial<Record<(typeof DIM_NAMES)[number], string>>,
@@ -107,13 +99,14 @@ const handler = createMcpHandler(
       `Full detail for one cell by cell_key: metrics, payback series, parent chain, children. ${GUARDRAILS}`,
       { cell_key: z.string().describe("Content-addressed cell key, e.g. from rank_cells") },
       async ({ cell_key }) => {
-        const data = await loadArtifacts();
-        const d = getCell(data, cell_key);
+        const store = await getStore();
+        const d = await store.getCell(cell_key);
         if (!d) {
+          const meta = await store.meta();
           return json({
             error: "cell_not_found",
             requested: cell_key,
-            try: { flip_cell: data.meta.flip_cell_key, untapped_cell: data.meta.untapped_cell_key },
+            try: { flip_cell: meta.flip_cell_key, untapped_cell: meta.untapped_cell_key },
           });
         }
         return json({
@@ -132,8 +125,8 @@ const handler = createMcpHandler(
       `WHY a cell got its verdict: the plain-English reason, per-trait decomposition effects (what each pinned trait adds/subtracts), and evidence provenance. ${GUARDRAILS}`,
       { cell_key: z.string() },
       async ({ cell_key }) => {
-        const data = await loadArtifacts();
-        const d = getCell(data, cell_key);
+        const store = await getStore();
+        const d = await store.getCell(cell_key);
         if (!d) return json({ error: "cell_not_found", requested: cell_key });
         return json({
           cell: cellPath(d.cell.dims),
@@ -163,8 +156,8 @@ const handler = createMcpHandler(
       `THE headline tool: cells the ad platform reports as winners (pixel ROAS ≥ 1) that actually LOSE money on 90-day truth. ${GUARDRAILS}`,
       { min_dollar_impact_per_day_usd: z.number().min(0).optional() },
       async ({ min_dollar_impact_per_day_usd }) => {
-        const data = await loadArtifacts();
-        const rows = listFlips(data, (min_dollar_impact_per_day_usd ?? 0) * 100);
+        const store = await getStore();
+        const rows = await store.listFlips((min_dollar_impact_per_day_usd ?? 0) * 100);
         return json({
           flips: rows.map(slim),
           mechanism:
@@ -178,9 +171,9 @@ const handler = createMcpHandler(
       `Cells that are barely funded but whose trait composition predicts outsized LTV per dollar — speculative by design, labeled as such. ${GUARDRAILS}`,
       {},
       async () => {
-        const data = await loadArtifacts();
+        const store = await getStore();
         return json({
-          untapped: findUntapped(data).map(slim),
+          untapped: (await store.findUntapped()).map(slim),
           caveat:
             "Imputed from the decomposition (damped trait stacking ÷ sibling CPL), not observed performance. Recommend test budgets, not full scaling.",
         });
@@ -192,8 +185,8 @@ const handler = createMcpHandler(
       `The Morning Brief: two headline numbers (measured bleed, hedged upside) and the deduplicated move list. Dollars are counted once, at the leaf level. ${GUARDRAILS}`,
       {},
       async () => {
-        const data = await loadArtifacts();
-        const brief = dailyBrief(data);
+        const store = await getStore();
+        const brief = await store.dailyBrief();
         return json({
           headline_bleed_usd_per_day: Math.round(brief.headline_bleed_c / 100),
           headline_upside_usd_per_day: Math.round(brief.headline_upside_c / 100),
@@ -208,7 +201,7 @@ const handler = createMcpHandler(
             corroborated_at_other_grains: c.also_visible_at.length,
             reason: c.reason,
           })),
-          snapshot_at: data.meta.snapshot_at,
+          snapshot_at: brief.snapshot_at,
         });
       },
     );
@@ -218,8 +211,8 @@ const handler = createMcpHandler(
       `Children of a cell (one level deeper in the grain hierarchy). ${GUARDRAILS}`,
       { cell_key: z.string() },
       async ({ cell_key }) => {
-        const data = await loadArtifacts();
-        return json({ children: drillDown(data, cell_key).slice(0, 30).map(slim) });
+        const store = await getStore();
+        return json({ children: (await store.drillDown(cell_key)).slice(0, 30).map(slim) });
       },
     );
 
@@ -239,11 +232,12 @@ const handler = createMcpHandler(
           .max(20),
       },
       async ({ changes }) => {
-        const data = await loadArtifacts();
+        const store = await getStore();
+        const meta = await store.meta();
         const lines: string[] = ["cell_key,cell,action,delta_pct,current_spend_per_day_usd,verdict,evidence"];
         const items = [];
         for (const ch of changes) {
-          const row = data.byKey.get(ch.cell_key);
+          const row = (await store.getCell(ch.cell_key))?.cell;
           if (!row) {
             items.push({ ...ch, error: "cell_not_found" });
             continue;
@@ -265,7 +259,7 @@ const handler = createMcpHandler(
           proposal: {
             status: "DRAFT — not executed; read-only tool by design",
             items,
-            created_from_snapshot: data.meta.snapshot_at,
+            created_from_snapshot: meta.snapshot_at,
           },
           csv: lines.join("\n"),
         });
@@ -274,7 +268,7 @@ const handler = createMcpHandler(
 
     // ---- resources: keep answers honest + citable --------------------------
     server.resource("methodology", "groundtruth://methodology", async () => {
-      const data = await loadArtifacts();
+      const meta = await (await getStore()).meta();
       return {
         contents: [
           {
@@ -286,20 +280,20 @@ const handler = createMcpHandler(
               shrinkage: `Thin cells borrow from their parent: weight = k/(k+n) with k=${THRESHOLDS.k_shrink} — a cell needs ~${THRESHOLDS.k_shrink} subscribers to mostly stand alone.`,
               uncertainty: "80% ranges; verdicts gate on the range bound, never the point estimate.",
               verdicts: "KILL: even the high end loses. TRIM: below break-even at high spend. SCALE: even the low end clears with margin. UNTAPPED: composed traits predict value, spend is starved — speculative. WATCH: not enough evidence (leaning shown).",
-              validate: data.meta.validate,
+              validate: meta.validate,
             }),
           },
         ],
       };
     });
     server.resource("thresholds", "groundtruth://thresholds", async () => {
-      const data = await loadArtifacts();
+      const meta = await (await getStore()).meta();
       return {
         contents: [
           {
             uri: "groundtruth://thresholds",
             mimeType: "application/json",
-            text: JSON.stringify({ thresholds: THRESHOLDS, grains: data.meta.grains }),
+            text: JSON.stringify({ thresholds: THRESHOLDS, grains: meta.grains }),
           },
         ],
       };

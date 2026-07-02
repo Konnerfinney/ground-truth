@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DIM_NAMES, type DimName } from "@/engine/dims";
-import { queryCells } from "@/engine/query";
 import { GrainNotAvailable } from "@/engine/types";
-import { loadArtifacts } from "@/lib/artifacts";
+import { getStore } from "@/lib/store";
 
 const paramsSchema = z.object({
   grain: z.string().min(1),
@@ -37,8 +36,8 @@ export async function GET(req: NextRequest) {
     : parsed.data.grain;
 
   try {
-    const data = await loadArtifacts();
-    const result = queryCells(data, { ...parsed.data, grain, filters });
+    const store = await getStore();
+    const result = await store.queryCells({ ...parsed.data, grain, filters });
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof GrainNotAvailable) {
