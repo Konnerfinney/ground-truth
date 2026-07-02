@@ -6,6 +6,7 @@ import {
   mapPlacement,
   metaAdapter,
   parseInsightsPage,
+  stripToken,
   type MetaInsightsResponse,
 } from "@/connectors/meta";
 import { parseName, parseNameHierarchy } from "@/connectors/naming";
@@ -105,26 +106,39 @@ describe("meta adapter", () => {
     expect(mapDevice(undefined)).toBe("all");
   });
 
-  it("builds a v25 ad-level insights URL with the delivery-breakdown trio", () => {
-    const url = insightsUrl({ accessToken: "tkn", adAccountId: "42" }, "2026-07-01");
+  it("builds a v25 ad-level insights URL — token NEVER in the URL", () => {
+    const url = insightsUrl({ accessToken: "tkn-secret", adAccountId: "42" }, "2026-07-01");
     expect(url).toContain("graph.facebook.com/v25.0/act_42/insights");
     expect(url).toContain("level=ad");
     expect(decodeURIComponent(url)).toContain("publisher_platform,platform_position,device_platform");
+    expect(url).not.toContain("tkn-secret");
+    expect(url).not.toContain("access_token");
   });
 
-  it("follows pagination and surfaces API errors with body context", async () => {
+  it("strips tokens Meta echoes into paging.next", () => {
+    expect(stripToken("https://graph.facebook.com/v25.0/act_1/insights?after=abc&access_token=LEAK")).toBe(
+      "https://graph.facebook.com/v25.0/act_1/insights?after=abc",
+    );
+  });
+
+  it("follows pagination with header auth on every request, surfaces API errors", async () => {
     const page2: MetaInsightsResponse = { data: [FIXTURE.data[1]] };
-    const page1: MetaInsightsResponse = { data: [FIXTURE.data[0]], paging: { next: "https://next.page" } };
-    const calls: string[] = [];
-    const fakeFetch = (async (url: string) => {
-      calls.push(String(url));
+    const page1: MetaInsightsResponse = {
+      data: [FIXTURE.data[0]],
+      paging: { next: "https://next.page/?after=x&access_token=LEAK" },
+    };
+    const calls: { url: string; auth: string | undefined }[] = [];
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), auth: (init?.headers as Record<string, string>)?.Authorization });
       const body = calls.length === 1 ? page1 : page2;
       return new Response(JSON.stringify(body), { status: 200 });
     }) as unknown as typeof fetch;
 
     const rows = await metaAdapter({ accessToken: "t", adAccountId: "act_9" }, fakeFetch).fetchSpend("2026-07-01");
     expect(rows).toHaveLength(2);
-    expect(calls[1]).toBe("https://next.page");
+    expect(calls[1].url).toBe("https://next.page/?after=x");
+    expect(calls.every((c) => c.auth === "Bearer t")).toBe(true);
+    expect(calls.every((c) => !c.url.includes("access_token"))).toBe(true);
 
     const errFetch = (async () => new Response('{"error":{"message":"(#190) token expired"}}', { status: 400 })) as unknown as typeof fetch;
     const err = await metaAdapter({ accessToken: "t", adAccountId: "9" }, errFetch)

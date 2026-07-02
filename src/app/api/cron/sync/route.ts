@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       try {
         rows = await adapter.fetchSpend(date);
       } catch (e) {
-        warnings.push(String(e).slice(0, 500));
+        warnings.push(redactSecrets(String(e)).slice(0, 500));
       }
       const unnamed = rows.filter((r) => !r.audience && !r.creative).length;
       if (unnamed > 0) {
@@ -118,6 +118,16 @@ export async function GET(req: NextRequest) {
   } finally {
     await sql.end();
   }
+}
+
+/**
+ * Nothing that even RESEMBLES a credential may be persisted: token-shaped
+ * query params and bearer strings are redacted before warnings are stored.
+ */
+function redactSecrets(s: string): string {
+  return s
+    .replace(/([?&](?:access_token|token|key|secret|client_secret)=)[^&\s"']+/gi, "$1[REDACTED]")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/g, "Bearer [REDACTED]");
 }
 
 function isoDaysAgo(n: number): string {

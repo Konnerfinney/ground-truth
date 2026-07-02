@@ -94,6 +94,8 @@ export function parseInsightsPage(page: MetaInsightsResponse): NormalizedSpendRo
   });
 }
 
+/** The token travels in an Authorization header, NEVER in the URL — URLs land
+ * in logs, proxies and error messages; headers don't. */
 export function insightsUrl(cfg: MetaConfig, date: string): string {
   const account = cfg.adAccountId.startsWith("act_") ? cfg.adAccountId : `act_${cfg.adAccountId}`;
   const params = new URLSearchParams({
@@ -104,12 +106,19 @@ export function insightsUrl(cfg: MetaConfig, date: string): string {
     time_range: JSON.stringify({ since: date, until: date }),
     time_increment: "1",
     limit: "500",
-    access_token: cfg.accessToken,
   });
   return `https://graph.facebook.com/${cfg.apiVersion ?? META_API_VERSION}/${account}/insights?${params}`;
 }
 
+/** Meta echoes request params into paging.next — strip any token before reuse. */
+export function stripToken(url: string): string {
+  const u = new URL(url);
+  u.searchParams.delete("access_token");
+  return u.toString();
+}
+
 export function metaAdapter(cfg: MetaConfig, fetchImpl: typeof fetch = fetch): SourceAdapter {
+  const headers = { Authorization: `Bearer ${cfg.accessToken}` };
   return {
     platform: "meta",
     async fetchSpend(date: string): Promise<NormalizedSpendRow[]> {
@@ -117,14 +126,14 @@ export function metaAdapter(cfg: MetaConfig, fetchImpl: typeof fetch = fetch): S
       let url: string | undefined = insightsUrl(cfg, date);
       let pages = 0;
       while (url && pages < 200) {
-        const res = await fetchImpl(url);
+        const res = await fetchImpl(url, { headers });
         if (!res.ok) {
           const body = await res.text();
           throw new Error(`meta insights ${res.status}: ${body.slice(0, 300)}`);
         }
         const page = (await res.json()) as MetaInsightsResponse;
         rows.push(...parseInsightsPage(page));
-        url = page.paging?.next;
+        url = page.paging?.next ? stripToken(page.paging.next) : undefined;
         pages++;
       }
       return rows;
