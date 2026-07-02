@@ -106,9 +106,9 @@ export function BulletBar({
  */
 export function Dumbbell({ platformRoas, truth, max = 3.5 }: { platformRoas: number; truth: number; max?: number }) {
   const w = 220;
-  const h = 26;
+  const h = 34;
   const x = (v: number) => 26 + Math.min(1, Math.max(0, v / max)) * (w - 52);
-  const y = h / 2;
+  const y = h / 2 + 2;
   const diverges = platformRoas > truth;
   return (
     <svg width={w} height={h} className="shrink-0" role="img" aria-label={`Platform claims ${mult(platformRoas)}, truth ${mult(truth)}`}>
