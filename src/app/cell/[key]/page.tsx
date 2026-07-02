@@ -187,8 +187,8 @@ function PaybackSvg({ cum, cac }: { cum: number[]; cac: number }) {
         </>
       )}
       {fakePeak && (
-        <text x={x(cum.indexOf(Math.max(...cum)))} y={Math.max(12, y(Math.max(...cum)) - 8)} textAnchor="middle" fontSize={10} fill="var(--kill)">
-          crosses, then refunds claw it back — never pays back
+        <text x={(pad.l + w - pad.r) / 2} y={14} textAnchor="middle" fontSize={11} fill="var(--kill)">
+          crosses the line, then refunds claw it back — never pays back
         </text>
       )}
       {/* axis labels */}
