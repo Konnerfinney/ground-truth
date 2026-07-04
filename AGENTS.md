@@ -14,7 +14,7 @@ Entry for It's Today Media's $5,000 Build Challenge (hiring contest, submission 
 - Pure-TS data engine in `src/engine/` (zero Next imports — unit-testable): seeded DGP (`pure-rand`), two-part GLM, empirical-Bayes shrinkage, ridge decomposition, curated-grain cube, verdict engine, `validate()` gate.
 - Snapshot artifacts in `data/artifacts/*.json` (committed, regenerable via `npm run generate`); served via `fs` + module cache; `outputFileTracingIncludes` bundles them on Vercel.
 - MCP server at `/api/mcp` via `mcp-handler` (read-only tools; zod schemas).
-- No database, no env vars, no external services, no auth.
+- The judged deployment runs with ZERO env vars (no database, no services, no auth). Postgres serving (`DATABASE_URL`), ad-platform connectors (`META_*`), and Google OIDC auth (`GOOGLE_OAUTH_*` + `AUTH_SECRET`) are optional-on: each activates only when its env exists. Never make a core surface depend on any of them.
 
 ## Commands
 - `npm run dev` · `npm run build` · `npm run lint` · `npm run typecheck` · `npm test` (vitest) · `npm run generate` (rebuild artifacts from seed).

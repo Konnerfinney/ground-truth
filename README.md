@@ -119,7 +119,7 @@ A `validate()` gate runs before any artifact ships — both planted stories reco
 
 ## Architecture
 
-One TypeScript repo, one Next.js app on Vercel. The data engine is pure TS with zero framework imports, run as a build-time script that emits static JSON snapshot artifacts. No database, no env vars, no external services the demo can die on during judging.
+One TypeScript repo, one Next.js app on Vercel. The data engine is pure TS with zero framework imports, run as a build-time script that emits static JSON snapshot artifacts. The judged deployment requires no database, no env vars, and no external services it can die on during judging — the Postgres backend, ad-platform connectors, and Google sign-in are all built in and all **optional-on**: each activates when its environment variables exist, and this deployment deliberately ships with none.
 
 ```mermaid
 flowchart LR
@@ -253,7 +253,7 @@ Questions a veteran buyer should ask this tool — asked and answered up front:
 git clone https://github.com/Konnerfinney/ground-truth && cd ground-truth
 npm install
 npm run generate   # rebuilds every artifact from the seed — byte-identical, validate-gated (~10s)
-npm test           # 103 tests: engine, models, DGP bands, query contract, pg↔memory parity
+npm test           # 126 tests: engine, models, DGP bands, query contract, pg↔memory parity, connectors, auth
 npm run dev        # http://localhost:3000
 ```
 
